@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "Badminton Court Manager",
+    "slug": "badminton-court-manager",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "platforms": ["android"],
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.kubc.badmintoncourtmanager",
+      "versionCode": 1
+    }
+  }
+}

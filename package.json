@@ -1,0 +1,26 @@
+{
+  "name": "badminton-court-manager",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "engines": {
+    "node": ">=20.19.4"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "build:android:preview": "eas build -p android --profile preview",
+    "build:android:production": "eas build -p android --profile production",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "expo": "~54.0.0",
+    "react": "19.1.0",
+    "react-native": "0.81.5"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.10",
+    "eas-cli": "^20.1.0",
+    "typescript": "~5.9.2"
+  }
+}

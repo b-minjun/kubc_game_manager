@@ -1,0 +1,563 @@
+import { Alert } from "react-native";
+import { useMemo, useState } from "react";
+
+import type { Court, Player, PlayerStatus, Team } from "../types";
+import { createId } from "../utils/id";
+
+const DEFAULT_COURT_COUNT = 3;
+const TEAM_SIZE = 4;
+
+function createCourt(number: number): Court {
+  return {
+    id: `court-${number}`,
+    number,
+    currentTeam: null,
+  };
+}
+
+function createInitialCourts(): Court[] {
+  return Array.from({ length: DEFAULT_COURT_COUNT }, (_, index) =>
+    createCourt(index + 1),
+  );
+}
+
+function hasDuplicateIds(ids: string[]): boolean {
+  return new Set(ids).size !== ids.length;
+}
+
+function renumberWaitingTeams(teams: Team[]): Team[] {
+  return teams.map((team, index) => {
+    const order = index + 1;
+
+    return {
+      ...team,
+      name: `팀 ${order}`,
+      order,
+    };
+  });
+}
+
+export function useBadmintonCourtManager() {
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [waitingTeams, setWaitingTeams] = useState<Team[]>([]);
+  const [courts, setCourts] = useState<Court[]>(createInitialCourts);
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+  const [selectedCourtByTeam, setSelectedCourtByTeamState] = useState<
+    Record<string, string>
+  >({});
+
+  const playingPlayerIds = useMemo(() => {
+    const ids = new Set<string>();
+    courts.forEach((court) => {
+      court.currentTeam?.players.forEach((player) => ids.add(player.id));
+    });
+    return ids;
+  }, [courts]);
+
+  const waitingPlayerIds = useMemo(() => {
+    const ids = new Set<string>();
+    waitingTeams.forEach((team) => {
+      team.players.forEach((player) => ids.add(player.id));
+    });
+    return ids;
+  }, [waitingTeams]);
+
+  const selectedPlayerIdSet = useMemo(
+    () => new Set(selectedPlayerIds),
+    [selectedPlayerIds],
+  );
+
+  const emptyCourts = useMemo(
+    () => courts.filter((court) => court.currentTeam === null),
+    [courts],
+  );
+
+  const getPlayerStatus = (playerId: string): PlayerStatus => {
+    if (playingPlayerIds.has(playerId)) {
+      return "playing";
+    }
+
+    if (waitingPlayerIds.has(playerId)) {
+      return "waiting";
+    }
+
+    if (selectedPlayerIdSet.has(playerId)) {
+      return "selected";
+    }
+
+    return "available";
+  };
+
+  const getPlayersByIds = (playerIds: string[]): Player[] | null => {
+    const playerMap = new Map(players.map((player) => [player.id, player]));
+    const nextPlayers = playerIds
+      .map((playerId) => playerMap.get(playerId))
+      .filter((player): player is Player => Boolean(player));
+
+    if (nextPlayers.length !== playerIds.length) {
+      Alert.alert("선수 확인", "선수 정보를 찾을 수 없습니다.");
+      return null;
+    }
+
+    return nextPlayers;
+  };
+
+  const getBlockedPlayerIdsForEdit = (
+    currentTarget:
+      | { type: "waiting"; teamId: string }
+      | { type: "court"; courtId: string },
+  ) => {
+    const blockedIds = new Set<string>();
+
+    waitingTeams.forEach((team) => {
+      const isCurrentWaitingTeam =
+        currentTarget.type === "waiting" && team.id === currentTarget.teamId;
+
+      if (!isCurrentWaitingTeam) {
+        team.players.forEach((player) => blockedIds.add(player.id));
+      }
+    });
+
+    courts.forEach((court) => {
+      const isCurrentCourtTeam =
+        currentTarget.type === "court" && court.id === currentTarget.courtId;
+
+      if (!isCurrentCourtTeam) {
+        court.currentTeam?.players.forEach((player) => blockedIds.add(player.id));
+      }
+    });
+
+    return blockedIds;
+  };
+
+  const validateTeamEdit = (
+    newPlayerIds: string[],
+    currentTarget:
+      | { type: "waiting"; teamId: string }
+      | { type: "court"; courtId: string },
+  ): Player[] | null => {
+    if (newPlayerIds.length !== TEAM_SIZE) {
+      Alert.alert("팀 수정", "팀은 반드시 4명이어야 합니다.");
+      return null;
+    }
+
+    if (hasDuplicateIds(newPlayerIds)) {
+      Alert.alert("팀 수정", "같은 선수를 중복으로 넣을 수 없습니다.");
+      return null;
+    }
+
+    const blockedIds = getBlockedPlayerIdsForEdit(currentTarget);
+    const blockedPlayer = newPlayerIds.find((playerId) =>
+      blockedIds.has(playerId),
+    );
+
+    if (blockedPlayer) {
+      Alert.alert(
+        "팀 수정",
+        "이미 다른 대기 팀이나 게임 중인 코트에 포함된 선수입니다.",
+      );
+      return null;
+    }
+
+    return getPlayersByIds(newPlayerIds);
+  };
+
+  const addPlayers = (inputText: string): void => {
+    const names = inputText
+      .trim()
+      .split(/\s+/)
+      .map((name) => name.trim())
+      .filter(Boolean);
+
+    if (names.length === 0) {
+      Alert.alert("참석자 추가", "이름을 입력해 주세요.");
+      return;
+    }
+
+    const existingNames = new Set(players.map((player) => player.name));
+    const batchNames = new Set<string>();
+    const duplicateNames: string[] = [];
+    const newPlayers: Player[] = [];
+
+    names.forEach((name) => {
+      if (existingNames.has(name) || batchNames.has(name)) {
+        duplicateNames.push(name);
+        return;
+      }
+
+      batchNames.add(name);
+      newPlayers.push({
+        id: createId("player"),
+        name,
+      });
+    });
+
+    if (newPlayers.length === 0) {
+      Alert.alert("참석자 추가", "이미 존재하는 이름입니다.");
+      return;
+    }
+
+    setPlayers((currentPlayers) => [...currentPlayers, ...newPlayers]);
+
+    if (duplicateNames.length > 0) {
+      Alert.alert("참석자 추가", "중복 이름은 제외했습니다.");
+    }
+  };
+
+  const removePlayer = (playerId: string): void => {
+    if (waitingPlayerIds.has(playerId) || playingPlayerIds.has(playerId)) {
+      Alert.alert("참석자 삭제", "이미 팀에 포함된 선수는 삭제할 수 없습니다.");
+      return;
+    }
+
+    setPlayers((currentPlayers) =>
+      currentPlayers.filter((player) => player.id !== playerId),
+    );
+    setSelectedPlayerIds((currentIds) =>
+      currentIds.filter((selectedId) => selectedId !== playerId),
+    );
+  };
+
+  const confirmRemovePlayer = (playerId: string): void => {
+    const player = players.find((currentPlayer) => currentPlayer.id === playerId);
+
+    if (!player) {
+      Alert.alert("참석자 삭제", "참석자를 찾을 수 없습니다.");
+      return;
+    }
+
+    Alert.alert("참석자 삭제", `${player.name}님을 삭제할까요?`, [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: () => removePlayer(playerId),
+      },
+    ]);
+  };
+
+  const toggleSelectPlayer = (playerId: string): void => {
+    const status = getPlayerStatus(playerId);
+
+    if (status === "waiting" || status === "playing") {
+      Alert.alert(
+        "선수 선택",
+        "대기 중이거나 게임 중인 선수는 선택할 수 없습니다.",
+      );
+      return;
+    }
+
+    setSelectedPlayerIds((currentIds) => {
+      if (currentIds.includes(playerId)) {
+        return currentIds.filter((selectedId) => selectedId !== playerId);
+      }
+
+      if (currentIds.length >= TEAM_SIZE) {
+        Alert.alert("선수 선택", "4명을 초과해서 선택할 수 없습니다.");
+        return currentIds;
+      }
+
+      return [...currentIds, playerId];
+    });
+  };
+
+  const addSelectedPlayersToWaitingQueue = (): void => {
+    if (selectedPlayerIds.length !== TEAM_SIZE) {
+      Alert.alert("대기열 추가", "정확히 4명을 선택해야 합니다.");
+      return;
+    }
+
+    const selectedPlayers = getPlayersByIds(selectedPlayerIds);
+
+    if (!selectedPlayers) {
+      return;
+    }
+
+    const unavailablePlayer = selectedPlayers.find((player) => {
+      const status = getPlayerStatus(player.id);
+      return status === "waiting" || status === "playing";
+    });
+
+    if (unavailablePlayer) {
+      Alert.alert(
+        "대기열 추가",
+        "대기 중이거나 게임 중인 선수가 포함되어 있습니다.",
+      );
+      return;
+    }
+
+    const team: Team = {
+      id: createId("team"),
+      name: "",
+      order: 0,
+      players: selectedPlayers,
+    };
+
+    setWaitingTeams((currentTeams) =>
+      renumberWaitingTeams([...currentTeams, team]),
+    );
+    setSelectedPlayerIds([]);
+  };
+
+  const deleteWaitingTeam = (teamId: string): void => {
+    setWaitingTeams((currentTeams) =>
+      renumberWaitingTeams(currentTeams.filter((team) => team.id !== teamId)),
+    );
+    setSelectedCourtByTeamState((currentMap) => {
+      const nextMap = { ...currentMap };
+      delete nextMap[teamId];
+      return nextMap;
+    });
+  };
+
+  const confirmDeleteWaitingTeam = (teamId: string): void => {
+    const team = waitingTeams.find((waitingTeam) => waitingTeam.id === teamId);
+
+    if (!team) {
+      Alert.alert("대기 팀 삭제", "대기 팀을 찾을 수 없습니다.");
+      return;
+    }
+
+    Alert.alert("대기 팀 삭제", `${team.name}를 삭제할까요?`, [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: () => deleteWaitingTeam(teamId),
+      },
+    ]);
+  };
+
+  const setSelectedCourtForTeam = (teamId: string, courtId: string): void => {
+    setSelectedCourtByTeamState((currentMap) => ({
+      ...currentMap,
+      [teamId]: courtId,
+    }));
+  };
+
+  const assignTeamToCourt = (teamId: string, courtId: string): void => {
+    const team = waitingTeams.find((waitingTeam) => waitingTeam.id === teamId);
+    const court = courts.find((currentCourt) => currentCourt.id === courtId);
+
+    if (!team) {
+      Alert.alert("코트 배정", "대기 팀을 찾을 수 없습니다.");
+      return;
+    }
+
+    if (!court) {
+      Alert.alert("코트 배정", "코트를 찾을 수 없습니다.");
+      return;
+    }
+
+    if (court.currentTeam) {
+      Alert.alert("코트 배정", "이미 게임 중인 코트에는 배정할 수 없습니다.");
+      return;
+    }
+
+    setCourts((currentCourts) =>
+      currentCourts.map((currentCourt) =>
+        currentCourt.id === courtId
+          ? { ...currentCourt, currentTeam: team }
+          : currentCourt,
+      ),
+    );
+    setWaitingTeams((currentTeams) =>
+      renumberWaitingTeams(
+        currentTeams.filter((waitingTeam) => waitingTeam.id !== teamId),
+      ),
+    );
+    setSelectedCourtByTeamState((currentMap) => {
+      const nextMap = { ...currentMap };
+      delete nextMap[teamId];
+      return nextMap;
+    });
+  };
+
+  const finishGame = (courtId: string): void => {
+    const court = courts.find((currentCourt) => currentCourt.id === courtId);
+
+    if (!court?.currentTeam) {
+      Alert.alert("게임 종료", "비어 있는 코트입니다.");
+      return;
+    }
+
+    setCourts((currentCourts) =>
+      currentCourts.map((currentCourt) =>
+        currentCourt.id === courtId
+          ? { ...currentCourt, currentTeam: null }
+          : currentCourt,
+      ),
+    );
+  };
+
+  const confirmFinishGame = (courtId: string): void => {
+    const court = courts.find((currentCourt) => currentCourt.id === courtId);
+
+    if (!court?.currentTeam) {
+      Alert.alert("게임 종료", "비어 있는 코트입니다.");
+      return;
+    }
+
+    Alert.alert("게임 종료", "정말 게임을 종료할까요?", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "종료",
+        style: "destructive",
+        onPress: () => finishGame(courtId),
+      },
+    ]);
+  };
+
+  const returnCourtTeamToWaitingQueue = (courtId: string): void => {
+    const court = courts.find((currentCourt) => currentCourt.id === courtId);
+
+    if (!court?.currentTeam) {
+      Alert.alert("대기열로 내리기", "비어 있는 코트입니다.");
+      return;
+    }
+
+    const team = court.currentTeam;
+
+    setWaitingTeams((currentTeams) =>
+      renumberWaitingTeams([...currentTeams, team]),
+    );
+    setCourts((currentCourts) =>
+      currentCourts.map((currentCourt) =>
+        currentCourt.id === courtId
+          ? { ...currentCourt, currentTeam: null }
+          : currentCourt,
+      ),
+    );
+  };
+
+  const updateWaitingTeamPlayers = (
+    teamId: string,
+    newPlayerIds: string[],
+  ): void => {
+    const team = waitingTeams.find((waitingTeam) => waitingTeam.id === teamId);
+
+    if (!team) {
+      Alert.alert("팀 수정", "대기 팀을 찾을 수 없습니다.");
+      return;
+    }
+
+    const nextPlayers = validateTeamEdit(newPlayerIds, {
+      type: "waiting",
+      teamId,
+    });
+
+    if (!nextPlayers) {
+      return;
+    }
+
+    setWaitingTeams((currentTeams) =>
+      renumberWaitingTeams(
+        currentTeams.map((waitingTeam) =>
+          waitingTeam.id === teamId
+            ? { ...waitingTeam, players: nextPlayers }
+            : waitingTeam,
+        ),
+      ),
+    );
+    setSelectedPlayerIds((currentIds) =>
+      currentIds.filter((playerId) => !newPlayerIds.includes(playerId)),
+    );
+  };
+
+  const updateCourtTeamPlayers = (
+    courtId: string,
+    newPlayerIds: string[],
+  ): void => {
+    const court = courts.find((currentCourt) => currentCourt.id === courtId);
+
+    if (!court?.currentTeam) {
+      Alert.alert("팀 수정", "게임 중인 코트가 아닙니다.");
+      return;
+    }
+
+    const nextPlayers = validateTeamEdit(newPlayerIds, {
+      type: "court",
+      courtId,
+    });
+
+    if (!nextPlayers) {
+      return;
+    }
+
+    setCourts((currentCourts) =>
+      currentCourts.map((currentCourt) =>
+        currentCourt.id === courtId && currentCourt.currentTeam
+          ? {
+              ...currentCourt,
+              currentTeam: {
+                ...currentCourt.currentTeam,
+                players: nextPlayers,
+              },
+            }
+          : currentCourt,
+      ),
+    );
+    setSelectedPlayerIds((currentIds) =>
+      currentIds.filter((playerId) => !newPlayerIds.includes(playerId)),
+    );
+  };
+
+  const updateCourtCount = (count: number): void => {
+    if (count < 1) {
+      Alert.alert("코트 설정", "코트는 최소 1개 이상이어야 합니다.");
+      return;
+    }
+
+    if (count === courts.length) {
+      return;
+    }
+
+    if (count > courts.length) {
+      const additionalCourts = Array.from(
+        { length: count - courts.length },
+        (_, index) => createCourt(courts.length + index + 1),
+      );
+      setCourts((currentCourts) => [...currentCourts, ...additionalCourts]);
+      return;
+    }
+
+    const courtsToRemove = courts.slice(count);
+    const hasPlayingCourt = courtsToRemove.some((court) => court.currentTeam);
+
+    if (hasPlayingCourt) {
+      Alert.alert("코트 설정", "게임 중인 코트가 있어서 줄일 수 없습니다.");
+      return;
+    }
+
+    setCourts((currentCourts) => currentCourts.slice(0, count));
+  };
+
+  return {
+    players,
+    waitingTeams,
+    courts,
+    emptyCourts,
+    selectedPlayerIds,
+    selectedCourtByTeam,
+    addPlayers,
+    removePlayer,
+    confirmRemovePlayer,
+    getPlayerStatus,
+    toggleSelectPlayer,
+    addSelectedPlayersToWaitingQueue,
+    deleteWaitingTeam,
+    confirmDeleteWaitingTeam,
+    setSelectedCourtForTeam,
+    assignTeamToCourt,
+    finishGame,
+    confirmFinishGame,
+    returnCourtTeamToWaitingQueue,
+    updateWaitingTeamPlayers,
+    updateCourtTeamPlayers,
+    updateCourtCount,
+  };
+}
+
+export type BadmintonCourtManager = ReturnType<
+  typeof useBadmintonCourtManager
+>;
