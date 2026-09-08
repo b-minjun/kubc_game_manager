@@ -1,42 +1,25 @@
 import { Alert } from "react-native";
 import * as Speech from "expo-speech";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { Court, Player, PlayerStatus, Team } from "../types";
+import type { GameState, Player, PlayerStatus, Team } from "../types";
+import {
+  createCourt,
+  createInitialGameState,
+  normalizeGameState,
+  renumberWaitingTeams,
+} from "../utils/gameState";
 import { createId } from "../utils/id";
 
-const DEFAULT_COURT_COUNT = 3;
 const TEAM_SIZE = 4;
 
-function createCourt(number: number): Court {
-  return {
-    id: `court-${number}`,
-    number,
-    currentTeam: null,
-    gameStartedAt: null,
-  };
-}
-
-function createInitialCourts(): Court[] {
-  return Array.from({ length: DEFAULT_COURT_COUNT }, (_, index) =>
-    createCourt(index + 1),
-  );
-}
+type UseBadmintonCourtManagerOptions = {
+  remoteState?: GameState | null;
+  onGameStateChange?: (state: GameState) => void;
+};
 
 function hasDuplicateIds(ids: string[]): boolean {
   return new Set(ids).size !== ids.length;
-}
-
-function renumberWaitingTeams(teams: Team[]): Team[] {
-  return teams.map((team, index) => {
-    const order = index + 1;
-
-    return {
-      ...team,
-      name: `팀 ${order}`,
-      order,
-    };
-  });
 }
 
 function announceCourtAssignment(team: Team, courtNumber: number): void {
@@ -50,14 +33,30 @@ function announceCourtAssignment(team: Team, courtNumber: number): void {
   });
 }
 
-export function useBadmintonCourtManager() {
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [waitingTeams, setWaitingTeams] = useState<Team[]>([]);
-  const [courts, setCourts] = useState<Court[]>(createInitialCourts);
+export function useBadmintonCourtManager({
+  remoteState,
+  onGameStateChange,
+}: UseBadmintonCourtManagerOptions = {}) {
+  const [gameState, setGameState] = useState<GameState>(() =>
+    normalizeGameState(remoteState ?? createInitialGameState()),
+  );
+  const gameStateRef = useRef(gameState);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   const [selectedCourtByTeam, setSelectedCourtByTeamState] = useState<
     Record<string, string>
   >({});
+
+  const { players, waitingTeams, courts } = gameState;
+
+  useEffect(() => {
+    if (!remoteState) {
+      return;
+    }
+
+    const nextState = normalizeGameState(remoteState);
+    gameStateRef.current = nextState;
+    setGameState(nextState);
+  }, [remoteState]);
 
   const playingPlayerIds = useMemo(() => {
     const ids = new Set<string>();
@@ -84,6 +83,38 @@ export function useBadmintonCourtManager() {
     () => courts.filter((court) => court.currentTeam === null),
     [courts],
   );
+
+  useEffect(() => {
+    const availablePlayerIds = new Set(players.map((player) => player.id));
+    const unavailablePlayerIds = new Set([
+      ...Array.from(waitingPlayerIds),
+      ...Array.from(playingPlayerIds),
+    ]);
+    const waitingTeamIds = new Set(waitingTeams.map((team) => team.id));
+    const emptyCourtIds = new Set(emptyCourts.map((court) => court.id));
+
+    setSelectedPlayerIds((currentIds) =>
+      currentIds.filter(
+        (playerId) =>
+          availablePlayerIds.has(playerId) && !unavailablePlayerIds.has(playerId),
+      ),
+    );
+    setSelectedCourtByTeamState((currentMap) =>
+      Object.fromEntries(
+        Object.entries(currentMap).filter(
+          ([teamId, courtId]) =>
+            waitingTeamIds.has(teamId) && emptyCourtIds.has(courtId),
+        ),
+      ),
+    );
+  }, [emptyCourts, players, playingPlayerIds, waitingPlayerIds, waitingTeams]);
+
+  const updateGameState = (updater: (currentState: GameState) => GameState) => {
+    const nextState = normalizeGameState(updater(gameStateRef.current));
+    gameStateRef.current = nextState;
+    setGameState(nextState);
+    onGameStateChange?.(nextState);
+  };
 
   const getPlayerStatus = (playerId: string): PlayerStatus => {
     if (playingPlayerIds.has(playerId)) {
@@ -210,7 +241,10 @@ export function useBadmintonCourtManager() {
       return;
     }
 
-    setPlayers((currentPlayers) => [...currentPlayers, ...newPlayers]);
+    updateGameState((currentState) => ({
+      ...currentState,
+      players: [...currentState.players, ...newPlayers],
+    }));
 
     if (duplicateNames.length > 0) {
       Alert.alert("참석자 추가", "중복 이름은 제외했습니다.");
@@ -223,9 +257,10 @@ export function useBadmintonCourtManager() {
       return;
     }
 
-    setPlayers((currentPlayers) =>
-      currentPlayers.filter((player) => player.id !== playerId),
-    );
+    updateGameState((currentState) => ({
+      ...currentState,
+      players: currentState.players.filter((player) => player.id !== playerId),
+    }));
     setSelectedPlayerIds((currentIds) =>
       currentIds.filter((selectedId) => selectedId !== playerId),
     );
@@ -306,16 +341,20 @@ export function useBadmintonCourtManager() {
       players: selectedPlayers,
     };
 
-    setWaitingTeams((currentTeams) =>
-      renumberWaitingTeams([...currentTeams, team]),
-    );
+    updateGameState((currentState) => ({
+      ...currentState,
+      waitingTeams: renumberWaitingTeams([...currentState.waitingTeams, team]),
+    }));
     setSelectedPlayerIds([]);
   };
 
   const deleteWaitingTeam = (teamId: string): void => {
-    setWaitingTeams((currentTeams) =>
-      renumberWaitingTeams(currentTeams.filter((team) => team.id !== teamId)),
-    );
+    updateGameState((currentState) => ({
+      ...currentState,
+      waitingTeams: renumberWaitingTeams(
+        currentState.waitingTeams.filter((team) => team.id !== teamId),
+      ),
+    }));
     setSelectedCourtByTeamState((currentMap) => {
       const nextMap = { ...currentMap };
       delete nextMap[teamId];
@@ -367,18 +406,19 @@ export function useBadmintonCourtManager() {
       return;
     }
 
-    setCourts((currentCourts) =>
-      currentCourts.map((currentCourt) =>
+    updateGameState((currentState) => ({
+      ...currentState,
+      courts: currentState.courts.map((currentCourt) =>
         currentCourt.id === courtId
           ? { ...currentCourt, currentTeam: team, gameStartedAt: Date.now() }
           : currentCourt,
       ),
-    );
-    setWaitingTeams((currentTeams) =>
-      renumberWaitingTeams(
-        currentTeams.filter((waitingTeam) => waitingTeam.id !== teamId),
+      waitingTeams: renumberWaitingTeams(
+        currentState.waitingTeams.filter(
+          (waitingTeam) => waitingTeam.id !== teamId,
+        ),
       ),
-    );
+    }));
     setSelectedCourtByTeamState((currentMap) => {
       const nextMap = { ...currentMap };
       delete nextMap[teamId];
@@ -410,8 +450,9 @@ export function useBadmintonCourtManager() {
     const nextTeam = getAutomaticNextTeamForFinish();
     const nextGameStartedAt = nextTeam ? Date.now() : null;
 
-    setCourts((currentCourts) =>
-      currentCourts.map((currentCourt) =>
+    updateGameState((currentState) => ({
+      ...currentState,
+      courts: currentState.courts.map((currentCourt) =>
         currentCourt.id === courtId
           ? {
               ...currentCourt,
@@ -420,23 +461,23 @@ export function useBadmintonCourtManager() {
             }
           : currentCourt,
       ),
-    );
+      waitingTeams: nextTeam
+        ? renumberWaitingTeams(
+            currentState.waitingTeams.filter(
+              (waitingTeam) => waitingTeam.id !== nextTeam.id,
+            ),
+          )
+        : currentState.waitingTeams,
+    }));
 
-    if (!nextTeam) {
-      return;
+    if (nextTeam) {
+      setSelectedCourtByTeamState((currentMap) => {
+        const nextMap = { ...currentMap };
+        delete nextMap[nextTeam.id];
+        return nextMap;
+      });
+      announceCourtAssignment(nextTeam, court.number);
     }
-
-    setWaitingTeams((currentTeams) =>
-      renumberWaitingTeams(
-        currentTeams.filter((waitingTeam) => waitingTeam.id !== nextTeam.id),
-      ),
-    );
-    setSelectedCourtByTeamState((currentMap) => {
-      const nextMap = { ...currentMap };
-      delete nextMap[nextTeam.id];
-      return nextMap;
-    });
-    announceCourtAssignment(nextTeam, court.number);
   };
 
   const confirmFinishGame = (courtId: string): void => {
@@ -472,16 +513,15 @@ export function useBadmintonCourtManager() {
 
     const team = court.currentTeam;
 
-    setWaitingTeams((currentTeams) =>
-      renumberWaitingTeams([...currentTeams, team]),
-    );
-    setCourts((currentCourts) =>
-      currentCourts.map((currentCourt) =>
+    updateGameState((currentState) => ({
+      ...currentState,
+      waitingTeams: renumberWaitingTeams([...currentState.waitingTeams, team]),
+      courts: currentState.courts.map((currentCourt) =>
         currentCourt.id === courtId
           ? { ...currentCourt, currentTeam: null, gameStartedAt: null }
           : currentCourt,
       ),
-    );
+    }));
   };
 
   const updateWaitingTeamPlayers = (
@@ -504,15 +544,16 @@ export function useBadmintonCourtManager() {
       return;
     }
 
-    setWaitingTeams((currentTeams) =>
-      renumberWaitingTeams(
-        currentTeams.map((waitingTeam) =>
+    updateGameState((currentState) => ({
+      ...currentState,
+      waitingTeams: renumberWaitingTeams(
+        currentState.waitingTeams.map((waitingTeam) =>
           waitingTeam.id === teamId
             ? { ...waitingTeam, players: nextPlayers }
             : waitingTeam,
         ),
       ),
-    );
+    }));
     setSelectedPlayerIds((currentIds) =>
       currentIds.filter((playerId) => !newPlayerIds.includes(playerId)),
     );
@@ -538,8 +579,9 @@ export function useBadmintonCourtManager() {
       return;
     }
 
-    setCourts((currentCourts) =>
-      currentCourts.map((currentCourt) =>
+    updateGameState((currentState) => ({
+      ...currentState,
+      courts: currentState.courts.map((currentCourt) =>
         currentCourt.id === courtId && currentCourt.currentTeam
           ? {
               ...currentCourt,
@@ -550,7 +592,7 @@ export function useBadmintonCourtManager() {
             }
           : currentCourt,
       ),
-    );
+    }));
     setSelectedPlayerIds((currentIds) =>
       currentIds.filter((playerId) => !newPlayerIds.includes(playerId)),
     );
@@ -567,11 +609,16 @@ export function useBadmintonCourtManager() {
     }
 
     if (count > courts.length) {
-      const additionalCourts = Array.from(
-        { length: count - courts.length },
-        (_, index) => createCourt(courts.length + index + 1),
-      );
-      setCourts((currentCourts) => [...currentCourts, ...additionalCourts]);
+      updateGameState((currentState) => ({
+        ...currentState,
+        courts: [
+          ...currentState.courts,
+          ...Array.from(
+            { length: count - currentState.courts.length },
+            (_, index) => createCourt(currentState.courts.length + index + 1),
+          ),
+        ],
+      }));
       return;
     }
 
@@ -583,7 +630,10 @@ export function useBadmintonCourtManager() {
       return;
     }
 
-    setCourts((currentCourts) => currentCourts.slice(0, count));
+    updateGameState((currentState) => ({
+      ...currentState,
+      courts: currentState.courts.slice(0, count),
+    }));
   };
 
   return {

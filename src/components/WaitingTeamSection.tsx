@@ -13,13 +13,21 @@ import { TeamEditModal } from "./TeamEditModal";
 
 type WaitingTeamSectionProps = {
   manager: BadmintonCourtManager;
+  canAssignTeams?: boolean;
+  canDeleteTeams?: boolean;
+  canEditTeams?: boolean;
 };
 
 function playerNames(team: Team): string {
   return team.players.map((player) => player.name).join(" / ");
 }
 
-export function WaitingTeamSection({ manager }: WaitingTeamSectionProps) {
+export function WaitingTeamSection({
+  manager,
+  canAssignTeams = true,
+  canDeleteTeams = true,
+  canEditTeams = true,
+}: WaitingTeamSectionProps) {
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
 
   const editingTeam = useMemo(
@@ -63,67 +71,81 @@ export function WaitingTeamSection({ manager }: WaitingTeamSectionProps) {
                   {playerNames(team)}
                 </Text>
 
-                <View style={styles.compactControlRow}>
-                  <View style={styles.courtColumn}>
-                    <Text style={styles.assignLabel}>코트</Text>
-                    {hasEmptyCourt ? (
-                      <View style={styles.courtChoiceRow}>
-                        {manager.emptyCourts.map((court) => {
-                          const isSelected = selectedCourtId === court.id;
+                {canAssignTeams || canDeleteTeams || canEditTeams ? (
+                  <View style={styles.compactControlRow}>
+                    {canAssignTeams ? (
+                      <View style={styles.courtColumn}>
+                        <Text style={styles.assignLabel}>코트</Text>
+                        {hasEmptyCourt ? (
+                          <View style={styles.courtChoiceRow}>
+                            {manager.emptyCourts.map((court) => {
+                              const isSelected = selectedCourtId === court.id;
 
-                          return (
-                            <Pressable
-                              key={court.id}
-                              onPress={() =>
-                                manager.setSelectedCourtForTeam(team.id, court.id)
-                              }
-                              style={[
-                                styles.courtChoice,
-                                isSelected && styles.selectedCourtChoice,
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.courtChoiceText,
-                                  isSelected && styles.selectedCourtChoiceText,
-                                ]}
-                              >
-                                {court.number}번
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
+                              return (
+                                <Pressable
+                                  key={court.id}
+                                  onPress={() =>
+                                    manager.setSelectedCourtForTeam(
+                                      team.id,
+                                      court.id,
+                                    )
+                                  }
+                                  style={[
+                                    styles.courtChoice,
+                                    isSelected && styles.selectedCourtChoice,
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.courtChoiceText,
+                                      isSelected &&
+                                        styles.selectedCourtChoiceText,
+                                    ]}
+                                  >
+                                    {court.number}번
+                                  </Text>
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+                        ) : (
+                          <Text style={styles.noCourtText}>빈 코트 없음</Text>
+                        )}
                       </View>
-                    ) : (
-                      <Text style={styles.noCourtText}>빈 코트 없음</Text>
-                    )}
-                  </View>
+                    ) : null}
 
-                  <View style={styles.actionRow}>
-                    <Pressable
-                      onPress={() => setEditingTeamId(team.id)}
-                      style={styles.secondaryButton}
-                    >
-                      <Text style={styles.secondaryButtonText}>수정</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => manager.confirmDeleteWaitingTeam(team.id)}
-                      style={styles.deleteButton}
-                    >
-                      <Text style={styles.deleteButtonText}>삭제</Text>
-                    </Pressable>
-                    <Pressable
-                      disabled={!hasEmptyCourt}
-                      onPress={() => handleAssign(team.id)}
-                      style={[
-                        styles.assignButton,
-                        !hasEmptyCourt && styles.disabledButton,
-                      ]}
-                    >
-                      <Text style={styles.assignButtonText}>넣기</Text>
-                    </Pressable>
+                    <View style={styles.actionRow}>
+                      {canEditTeams ? (
+                        <Pressable
+                          onPress={() => setEditingTeamId(team.id)}
+                          style={styles.secondaryButton}
+                        >
+                          <Text style={styles.secondaryButtonText}>수정</Text>
+                        </Pressable>
+                      ) : null}
+                      {canDeleteTeams ? (
+                        <Pressable
+                          onPress={() => manager.confirmDeleteWaitingTeam(team.id)}
+                          style={styles.deleteButton}
+                        >
+                          <Text style={styles.deleteButtonText}>삭제</Text>
+                        </Pressable>
+                      ) : null}
+                      {canAssignTeams ? (
+                        <Pressable
+                          disabled={!hasEmptyCourt}
+                          onPress={() => handleAssign(team.id)}
+                          style={[
+                            styles.assignButton,
+                            !hasEmptyCourt && styles.disabledButton,
+                          ]}
+                        >
+                          <Text style={styles.assignButtonText}>넣기</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
                   </View>
-                </View>
+                ) : null}
               </View>
             );
           })}

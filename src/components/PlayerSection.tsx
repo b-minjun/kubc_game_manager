@@ -13,6 +13,8 @@ import type { PlayerStatus } from "../types";
 
 type PlayerSectionProps = {
   manager: BadmintonCourtManager;
+  canAddWaitingTeams?: boolean;
+  canRemovePlayers?: boolean;
 };
 
 const statusLabel: Record<PlayerStatus, string> = {
@@ -22,11 +24,19 @@ const statusLabel: Record<PlayerStatus, string> = {
   playing: "게임",
 };
 
-export function PlayerSection({ manager }: PlayerSectionProps) {
+export function PlayerSection({
+  manager,
+  canAddWaitingTeams = true,
+  canRemovePlayers = true,
+}: PlayerSectionProps) {
   const [inputText, setInputText] = useState("");
   const ignoreNextPressRef = useRef(false);
 
   const handleAddPlayers = () => {
+    if (!canAddWaitingTeams) {
+      return;
+    }
+
     manager.addPlayers(inputText);
     setInputText("");
   };
@@ -44,6 +54,10 @@ export function PlayerSection({ manager }: PlayerSectionProps) {
   };
 
   const handlePlayerPress = (playerId: string) => {
+    if (!canAddWaitingTeams) {
+      return;
+    }
+
     if (ignoreNextPressRef.current) {
       ignoreNextPressRef.current = false;
       return;
@@ -57,6 +71,7 @@ export function PlayerSection({ manager }: PlayerSectionProps) {
       <Text style={styles.sectionTitle}>참석자 추가</Text>
       <View style={styles.inputRow}>
         <TextInput
+          editable={canAddWaitingTeams}
           onChangeText={setInputText}
           onSubmitEditing={handleAddPlayers}
           placeholder="민준 현선 철수 영희"
@@ -65,7 +80,11 @@ export function PlayerSection({ manager }: PlayerSectionProps) {
           style={styles.input}
           value={inputText}
         />
-        <Pressable onPress={handleAddPlayers} style={styles.addButton}>
+        <Pressable
+          disabled={!canAddWaitingTeams}
+          onPress={handleAddPlayers}
+          style={[styles.addButton, !canAddWaitingTeams && styles.disabledButton]}
+        >
           <Text style={styles.addButtonText}>추가</Text>
         </Pressable>
       </View>
@@ -89,7 +108,11 @@ export function PlayerSection({ manager }: PlayerSectionProps) {
               <Pressable
                 key={player.id}
                 delayLongPress={450}
-                onLongPress={() => showPlayerOptions(player.id, player.name)}
+                onLongPress={() => {
+                  if (canRemovePlayers) {
+                    showPlayerOptions(player.id, player.name);
+                  }
+                }}
                 onPress={() => handlePlayerPress(player.id)}
                 style={[
                   styles.playerItem,
@@ -117,11 +140,12 @@ export function PlayerSection({ manager }: PlayerSectionProps) {
       )}
 
       <Pressable
-        disabled={manager.selectedPlayerIds.length !== 4}
+        disabled={!canAddWaitingTeams || manager.selectedPlayerIds.length !== 4}
         onPress={manager.addSelectedPlayersToWaitingQueue}
         style={[
           styles.queueButton,
           manager.selectedPlayerIds.length !== 4 && styles.disabledButton,
+          !canAddWaitingTeams && styles.disabledButton,
         ]}
       >
         <Text style={styles.queueButtonText}>대기열 추가</Text>

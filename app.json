@@ -3,15 +3,25 @@
     "name": "코트큐",
     "slug": "badminton-court-manager",
     "version": "1.0.0",
-    "orientation": "landscape",
+    "orientation": "default",
     "platforms": [
       "android"
     ],
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "코트큐 방 QR 코드를 스캔하기 위해 카메라를 사용합니다.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
+    ],
     "android": {
       "package": "com.kubc.badmintoncourtmanager",
-      "versionCode": 12,
+      "versionCode": 18,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#006B45"

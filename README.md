@@ -1,6 +1,12 @@
 # 코트큐
 
-React Native + Expo + TypeScript 기반의 로컬 MVP 앱입니다. 참석자 4명을 선택해 대기 팀을 만들고, 원하는 빈 코트에 직접 배정할 수 있습니다.
+React Native + Expo + TypeScript 기반의 온라인 방 관리 앱입니다. 호스트가 방을 만들면 참가자는 QR 코드 또는 방 코드/비밀번호로 들어와 대기열을 추가하고 수정할 수 있습니다.
+
+## Supabase 준비
+
+Supabase Dashboard에서 프로젝트를 열고 `SQL Editor`에 [supabase/schema.sql](./supabase/schema.sql) 내용을 그대로 실행해야 합니다.
+
+앱은 Supabase `rooms` 테이블에 방 상태를 JSON으로 저장하고 Realtime으로 동기화합니다. 현재 클라이언트 권한 제한은 앱 UI 기준입니다.
 
 ## 실행
 

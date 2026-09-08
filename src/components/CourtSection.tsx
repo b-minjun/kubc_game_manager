@@ -7,6 +7,7 @@ import { TeamEditModal } from "./TeamEditModal";
 
 type CourtSectionProps = {
   manager: BadmintonCourtManager;
+  canManageCourts?: boolean;
 };
 
 const WARNING_ELAPSED_MS = 15 * 60 * 1000;
@@ -35,7 +36,10 @@ function formatElapsedTime(startedAt: number | null, now: number): string {
   return `${paddedMinutes}:${paddedSeconds}`;
 }
 
-export function CourtSection({ manager }: CourtSectionProps) {
+export function CourtSection({
+  manager,
+  canManageCourts = true,
+}: CourtSectionProps) {
   const [editingCourtId, setEditingCourtId] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
 
@@ -118,30 +122,32 @@ export function CourtSection({ manager }: CourtSectionProps) {
                   </View>
                   <Text style={styles.playerText}>{playerNames(team)}</Text>
 
-                  <View style={styles.actionRow}>
-                    <Pressable
-                      onPress={() => setEditingCourtId(court.id)}
-                      style={styles.secondaryButton}
-                    >
-                      <Text style={styles.secondaryButtonText}>팀 수정</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() =>
-                        manager.returnCourtTeamToWaitingQueue(court.id)
-                      }
-                      style={styles.returnButton}
-                    >
-                      <Text style={styles.returnButtonText}>
-                        대기열로 내리기
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => manager.confirmFinishGame(court.id)}
-                      style={styles.finishButton}
-                    >
-                      <Text style={styles.finishButtonText}>게임 종료</Text>
-                    </Pressable>
-                  </View>
+                  {canManageCourts ? (
+                    <View style={styles.actionRow}>
+                      <Pressable
+                        onPress={() => setEditingCourtId(court.id)}
+                        style={styles.secondaryButton}
+                      >
+                        <Text style={styles.secondaryButtonText}>팀 수정</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() =>
+                          manager.returnCourtTeamToWaitingQueue(court.id)
+                        }
+                        style={styles.returnButton}
+                      >
+                        <Text style={styles.returnButtonText}>
+                          대기열로 내리기
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => manager.confirmFinishGame(court.id)}
+                        style={styles.finishButton}
+                      >
+                        <Text style={styles.finishButtonText}>게임 종료</Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
                 </>
               ) : (
                 <Text style={styles.emptyText}>
@@ -153,7 +159,7 @@ export function CourtSection({ manager }: CourtSectionProps) {
         })}
       </View>
 
-      {editingCourt?.currentTeam ? (
+      {canManageCourts && editingCourt?.currentTeam ? (
         <TeamEditModal
           getPlayerStatus={manager.getPlayerStatus}
           initialPlayerIds={editingCourt.currentTeam.players.map(

@@ -18,3 +18,18 @@ export type Court = {
 };
 
 export type PlayerStatus = "available" | "selected" | "waiting" | "playing";
+
+export type GameState = {
+  players: Player[];
+  waitingTeams: Team[];
+  courts: Court[];
+};
+
+export type RoomRole = "host" | "guest";
+
+export type RoomSession = {
+  code: string;
+  password: string;
+  role: RoomRole;
+  hostToken?: string;
+};

@@ -1,4 +1,35 @@
+# Dependencies
 node_modules/
+
+# Expo / React Native local state
 .expo/
+.expo-shared/
+android/
+ios/
+
+# Build output
 dist/
+build/
+web-build/
+*.apk
+*.aab
+*.apks
+*.ipa
+
+# Local environment / secrets
+.env
+.env.*
+!.env.example
+credentials.json
+
+# Supabase CLI local state
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+
+# Logs and test output
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+coverage/
