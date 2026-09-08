@@ -14,6 +14,7 @@ export type Court = {
   id: string;
   number: number;
   currentTeam: Team | null;
+  gameStartedAt: number | null;
 };
 
 export type PlayerStatus = "available" | "selected" | "waiting" | "playing";

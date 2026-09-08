@@ -1,4 +1,4 @@
-# Badminton Court Manager
+# 코트큐
 
 React Native + Expo + TypeScript 기반의 로컬 MVP 앱입니다. 참석자 4명을 선택해 대기 팀을 만들고, 원하는 빈 코트에 직접 배정할 수 있습니다.
 

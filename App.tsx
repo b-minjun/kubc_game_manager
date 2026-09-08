@@ -18,9 +18,7 @@ export default function App() {
   const manager = useBadmintonCourtManager();
   const { height, width } = useWindowDimensions();
   const isLandscapeTablet = width > height && width >= 840;
-  const waitingListMaxHeight = isLandscapeTablet
-    ? Math.max(260, height - 178)
-    : undefined;
+  const shouldStackPlayerSection = isLandscapeTablet && width < 1120;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -44,22 +42,34 @@ export default function App() {
           style={[
             styles.dashboard,
             isLandscapeTablet && styles.landscapeDashboard,
+            shouldStackPlayerSection && styles.stackedLandscapeDashboard,
           ]}
         >
-          <View style={[styles.column, isLandscapeTablet && styles.leftColumn]}>
+          <View
+            style={[
+              styles.column,
+              isLandscapeTablet && styles.playerColumn,
+              shouldStackPlayerSection && styles.fullWidthColumn,
+            ]}
+          >
             <PlayerSection manager={manager} />
           </View>
 
-          <View style={[styles.column, isLandscapeTablet && styles.middleColumn]}>
-            <WaitingTeamSection
-              manager={manager}
-              maxListHeight={waitingListMaxHeight}
-            />
-          </View>
+          <View
+            style={[
+              styles.gameColumns,
+              isLandscapeTablet && styles.landscapeGameColumns,
+              shouldStackPlayerSection && styles.fullWidthColumn,
+            ]}
+          >
+            <View style={[styles.column, isLandscapeTablet && styles.gameColumn]}>
+              <WaitingTeamSection manager={manager} />
+            </View>
 
-          <View style={[styles.column, isLandscapeTablet && styles.rightColumn]}>
-            <CourtSection manager={manager} />
-            <CourtSettingSection manager={manager} />
+            <View style={[styles.column, isLandscapeTablet && styles.gameColumn]}>
+              <CourtSection manager={manager} />
+              <CourtSettingSection manager={manager} />
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -98,19 +108,30 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
   },
+  stackedLandscapeDashboard: {
+    flexDirection: "column",
+  },
   column: {
     gap: 12,
   },
-  leftColumn: {
-    flex: 1.18,
+  playerColumn: {
+    width: 356,
+    flexShrink: 0,
+  },
+  fullWidthColumn: {
+    width: "100%",
+  },
+  gameColumns: {
+    gap: 12,
+  },
+  landscapeGameColumns: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
     minWidth: 0,
   },
-  middleColumn: {
-    flex: 0.98,
-    minWidth: 0,
-  },
-  rightColumn: {
-    flex: 1.08,
+  gameColumn: {
+    flex: 1,
     minWidth: 0,
   },
   title: {

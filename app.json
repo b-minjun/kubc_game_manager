@@ -1,14 +1,26 @@
 {
   "expo": {
-    "name": "Badminton Court Manager",
+    "name": "코트큐",
     "slug": "badminton-court-manager",
     "version": "1.0.0",
     "orientation": "landscape",
-    "platforms": ["android"],
+    "platforms": [
+      "android"
+    ],
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "android": {
       "package": "com.kubc.badmintoncourtmanager",
-      "versionCode": 1
+      "versionCode": 12,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#006B45"
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "2f8252c1-0bd6-4604-a1eb-739a481f979c"
+      }
     }
   }
 }

@@ -209,7 +209,8 @@ const styles = StyleSheet.create({
   },
   playerItem: {
     minHeight: 54,
-    minWidth: 154,
+    width: "48%",
+    minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -238,6 +239,7 @@ const styles = StyleSheet.create({
   },
   statusBadge: {
     overflow: "hidden",
+    flexShrink: 0,
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,

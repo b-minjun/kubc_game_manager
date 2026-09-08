@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import {
   Alert,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -14,17 +13,13 @@ import { TeamEditModal } from "./TeamEditModal";
 
 type WaitingTeamSectionProps = {
   manager: BadmintonCourtManager;
-  maxListHeight?: number;
 };
 
 function playerNames(team: Team): string {
   return team.players.map((player) => player.name).join(" / ");
 }
 
-export function WaitingTeamSection({
-  manager,
-  maxListHeight,
-}: WaitingTeamSectionProps) {
+export function WaitingTeamSection({ manager }: WaitingTeamSectionProps) {
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
 
   const editingTeam = useMemo(
@@ -53,12 +48,7 @@ export function WaitingTeamSection({
       {manager.waitingTeams.length === 0 ? (
         <Text style={styles.emptyText}>대기 중인 팀이 없습니다.</Text>
       ) : (
-        <ScrollView
-          contentContainerStyle={styles.teamList}
-          nestedScrollEnabled
-          showsVerticalScrollIndicator
-          style={maxListHeight ? { maxHeight: maxListHeight } : undefined}
-        >
+        <View style={styles.teamList}>
           {manager.waitingTeams.map((team) => {
             const selectedCourtId = manager.selectedCourtByTeam[team.id];
             const hasEmptyCourt = manager.emptyCourts.length > 0;
@@ -69,7 +59,9 @@ export function WaitingTeamSection({
                   <Text style={styles.teamTitle}>{team.name}</Text>
                   <Text style={styles.orderBadge}>대기 {team.order}</Text>
                 </View>
-                <Text style={styles.playerText}>{playerNames(team)}</Text>
+                <Text numberOfLines={1} style={styles.playerText}>
+                  {playerNames(team)}
+                </Text>
 
                 <View style={styles.compactControlRow}>
                   <View style={styles.courtColumn}>
@@ -135,7 +127,7 @@ export function WaitingTeamSection({
               </View>
             );
           })}
-        </ScrollView>
+        </View>
       )}
 
       {editingTeam ? (
@@ -228,8 +220,8 @@ const styles = StyleSheet.create({
   },
   playerText: {
     marginTop: 5,
-    fontSize: 14,
-    lineHeight: 19,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: "700",
     color: "#334155",
   },
@@ -260,21 +252,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#cbd5e1",
+    borderColor: "#22c55e",
     paddingHorizontal: 9,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#dcfce7",
   },
   selectedCourtChoice: {
-    borderColor: "#2563eb",
-    backgroundColor: "#dbeafe",
+    borderColor: "#15803d",
+    backgroundColor: "#16a34a",
   },
   courtChoiceText: {
     fontSize: 13,
     fontWeight: "800",
-    color: "#334155",
+    color: "#166534",
   },
   selectedCourtChoiceText: {
-    color: "#1d4ed8",
+    color: "#ffffff",
   },
   noCourtText: {
     color: "#991b1b",

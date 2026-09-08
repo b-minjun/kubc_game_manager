@@ -1,4 +1,5 @@
 import { Alert } from "react-native";
+import * as Speech from "expo-speech";
 import { useMemo, useState } from "react";
 
 import type { Court, Player, PlayerStatus, Team } from "../types";
@@ -12,6 +13,7 @@ function createCourt(number: number): Court {
     id: `court-${number}`,
     number,
     currentTeam: null,
+    gameStartedAt: null,
   };
 }
 
@@ -34,6 +36,17 @@ function renumberWaitingTeams(teams: Team[]): Team[] {
       name: `팀 ${order}`,
       order,
     };
+  });
+}
+
+function announceCourtAssignment(team: Team, courtNumber: number): void {
+  const playerNames = team.players.map((player) => player.name).join(", ");
+  const message = `${playerNames} ${courtNumber}번째 코트 들어가세요`;
+
+  Speech.speak(message, {
+    language: "ko-KR",
+    pitch: 1,
+    rate: 0.92,
   });
 }
 
@@ -357,7 +370,7 @@ export function useBadmintonCourtManager() {
     setCourts((currentCourts) =>
       currentCourts.map((currentCourt) =>
         currentCourt.id === courtId
-          ? { ...currentCourt, currentTeam: team }
+          ? { ...currentCourt, currentTeam: team, gameStartedAt: Date.now() }
           : currentCourt,
       ),
     );
@@ -371,6 +384,19 @@ export function useBadmintonCourtManager() {
       delete nextMap[teamId];
       return nextMap;
     });
+    announceCourtAssignment(team, court.number);
+  };
+
+  const getAutomaticNextTeamForFinish = (): Team | null => {
+    const areAllCourtsPlaying = courts.every(
+      (currentCourt) => currentCourt.currentTeam !== null,
+    );
+
+    if (!areAllCourtsPlaying) {
+      return null;
+    }
+
+    return waitingTeams[0] ?? null;
   };
 
   const finishGame = (courtId: string): void => {
@@ -381,13 +407,36 @@ export function useBadmintonCourtManager() {
       return;
     }
 
+    const nextTeam = getAutomaticNextTeamForFinish();
+    const nextGameStartedAt = nextTeam ? Date.now() : null;
+
     setCourts((currentCourts) =>
       currentCourts.map((currentCourt) =>
         currentCourt.id === courtId
-          ? { ...currentCourt, currentTeam: null }
+          ? {
+              ...currentCourt,
+              currentTeam: nextTeam,
+              gameStartedAt: nextGameStartedAt,
+            }
           : currentCourt,
       ),
     );
+
+    if (!nextTeam) {
+      return;
+    }
+
+    setWaitingTeams((currentTeams) =>
+      renumberWaitingTeams(
+        currentTeams.filter((waitingTeam) => waitingTeam.id !== nextTeam.id),
+      ),
+    );
+    setSelectedCourtByTeamState((currentMap) => {
+      const nextMap = { ...currentMap };
+      delete nextMap[nextTeam.id];
+      return nextMap;
+    });
+    announceCourtAssignment(nextTeam, court.number);
   };
 
   const confirmFinishGame = (courtId: string): void => {
@@ -398,7 +447,12 @@ export function useBadmintonCourtManager() {
       return;
     }
 
-    Alert.alert("게임 종료", "정말 게임을 종료할까요?", [
+    const nextTeam = getAutomaticNextTeamForFinish();
+    const message = nextTeam
+      ? `정말 게임을 종료할까요?\n종료하면 ${nextTeam.name}이 자동으로 들어갑니다.`
+      : "정말 게임을 종료할까요?";
+
+    Alert.alert("게임 종료", message, [
       { text: "취소", style: "cancel" },
       {
         text: "종료",
@@ -424,7 +478,7 @@ export function useBadmintonCourtManager() {
     setCourts((currentCourts) =>
       currentCourts.map((currentCourt) =>
         currentCourt.id === courtId
-          ? { ...currentCourt, currentTeam: null }
+          ? { ...currentCourt, currentTeam: null, gameStartedAt: null }
           : currentCourt,
       ),
     );
