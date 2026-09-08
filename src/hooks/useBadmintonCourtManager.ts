@@ -1,5 +1,6 @@
 import { Alert } from "react-native";
 import * as Speech from "expo-speech";
+import type { SpeechOptions, Voice } from "expo-speech";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { GameState, Player, PlayerStatus, Team } from "../types";
@@ -22,15 +23,69 @@ function hasDuplicateIds(ids: string[]): boolean {
   return new Set(ids).size !== ids.length;
 }
 
-function announceCourtAssignment(team: Team, courtNumber: number): void {
-  const playerNames = team.players.map((player) => player.name).join(", ");
-  const message = `${playerNames} ${courtNumber}번째 코트 들어가세요`;
+function scoreConfidentKoreanVoice(voice: Voice): number {
+  const language = voice.language.toLowerCase();
+  const voiceName = `${voice.name} ${voice.identifier}`.toLowerCase();
+  let score = 0;
 
-  Speech.speak(message, {
+  if (language === "ko-kr") {
+    score += 80;
+  } else if (language.startsWith("ko")) {
+    score += 60;
+  }
+
+  if (voice.quality === Speech.VoiceQuality.Enhanced) {
+    score += 20;
+  }
+
+  if (voiceName.includes("male") || voiceName.includes("man")) {
+    score += 12;
+  }
+
+  if (voiceName.includes("google") || voiceName.includes("samsung")) {
+    score += 6;
+  }
+
+  return score;
+}
+
+function getConfidentKoreanVoiceIdentifier(voices: Voice[]): string | undefined {
+  return voices
+    .filter((voice) => voice.language.toLowerCase().startsWith("ko"))
+    .sort(
+      (firstVoice, secondVoice) =>
+        scoreConfidentKoreanVoice(secondVoice) -
+        scoreConfidentKoreanVoice(firstVoice),
+    )[0]?.identifier;
+}
+
+function announceCourtAssignment(
+  team: Team,
+  courtNumber: number,
+  voiceIdentifier?: string,
+): void {
+  const playerNames = team.players.map((player) => player.name).join(", ");
+  const message = `${playerNames}! ${courtNumber}번 코트로 입장하세요.`;
+  const fallbackOptions: SpeechOptions = {
     language: "ko-KR",
-    pitch: 1,
-    rate: 0.92,
-  });
+    pitch: 0.78,
+    rate: 0.86,
+    volume: 1,
+  };
+
+  void Speech.stop()
+    .catch(() => undefined)
+    .finally(() => {
+      Speech.speak(message, {
+        ...fallbackOptions,
+        voice: voiceIdentifier,
+        onError: () => {
+          if (voiceIdentifier) {
+            Speech.speak(message, fallbackOptions);
+          }
+        },
+      });
+    });
 }
 
 export function useBadmintonCourtManager({
@@ -41,12 +96,30 @@ export function useBadmintonCourtManager({
     normalizeGameState(remoteState ?? createInitialGameState()),
   );
   const gameStateRef = useRef(gameState);
+  const confidentVoiceIdentifierRef = useRef<string | undefined>(undefined);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   const [selectedCourtByTeam, setSelectedCourtByTeamState] = useState<
     Record<string, string>
   >({});
 
   const { players, waitingTeams, courts } = gameState;
+
+  useEffect(() => {
+    let isActive = true;
+
+    void Speech.getAvailableVoicesAsync()
+      .then((voices) => {
+        if (isActive) {
+          confidentVoiceIdentifierRef.current =
+            getConfidentKoreanVoiceIdentifier(voices);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!remoteState) {
@@ -424,7 +497,11 @@ export function useBadmintonCourtManager({
       delete nextMap[teamId];
       return nextMap;
     });
-    announceCourtAssignment(team, court.number);
+    announceCourtAssignment(
+      team,
+      court.number,
+      confidentVoiceIdentifierRef.current,
+    );
   };
 
   const getAutomaticNextTeamForFinish = (): Team | null => {
@@ -476,7 +553,11 @@ export function useBadmintonCourtManager({
         delete nextMap[nextTeam.id];
         return nextMap;
       });
-      announceCourtAssignment(nextTeam, court.number);
+      announceCourtAssignment(
+        nextTeam,
+        court.number,
+        confidentVoiceIdentifierRef.current,
+      );
     }
   };
 

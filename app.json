@@ -21,7 +21,7 @@
     ],
     "android": {
       "package": "com.kubc.badmintoncourtmanager",
-      "versionCode": 18,
+      "versionCode": 20,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#006B45"
