@@ -21,6 +21,17 @@ web-build/
 .env.*
 !.env.example
 credentials.json
+credentials/
+*.jks
+*.keystore
+*.p8
+*.p12
+
+# Local verification helpers
+bundletool-all-*.jar
+tmp_aab_inspect/
+jdk17/
+temurin17.zip
 
 # Supabase CLI local state
 supabase/.branches/

@@ -5,7 +5,8 @@
     "version": "1.0.0",
     "orientation": "default",
     "platforms": [
-      "android"
+      "android",
+      "ios"
     ],
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -20,12 +21,17 @@
       ]
     ],
     "android": {
-      "package": "com.kubc.badmintoncourtmanager",
-      "versionCode": 20,
+      "package": "com.kubc.baidmintoncourt",
+      "versionCode": 24,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#006B45"
       }
+    },
+    "ios": {
+      "bundleIdentifier": "com.kubc.baidmintoncourt",
+      "buildNumber": "1",
+      "supportsTablet": true
     },
     "extra": {
       "eas": {
